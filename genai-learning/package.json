@@ -10,6 +10,10 @@
     "lesson8": "node lesson8-vectorstore.js",
     "lesson9": "node lesson9-rag-pipeline.js",
     "lesson10": "node lesson10-pdf-rag.js",
+    "lesson11": "node lesson11-what-is-agent.js",
+    "lesson12": "node lesson12-langgraph.js",
+    "lesson13": "node lesson13-agent-memory.js",
+    "lesson14": "node lesson14-research-agent.js",
     "pdf-chat": "node lesson10-pdf-rag.js"
   },
   "keywords": [],
@@ -20,6 +24,7 @@
     "@langchain/community": "^1.1.27",
     "@langchain/core": "^1.1.42",
     "@langchain/google-genai": "^2.1.29",
+    "@langchain/langgraph": "^1.2.9",
     "@langchain/textsplitters": "^1.0.1",
     "chromadb": "^3.4.3",
     "dotenv": "^17.4.2",
