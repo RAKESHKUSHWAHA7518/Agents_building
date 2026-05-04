@@ -5,10 +5,13 @@ import { readSSEStream } from "../utils/helpers.js";
 
 export function useAnalysis(sessionId) {
   const [analysis, setAnalysis] = useState(null);
+  const [strategy, setStrategy] = useState(null);
   const [rewrittenResume, setRewrittenResume] = useState("");
   const [coverLetter, setCoverLetter] = useState("");
   const [interviewPrep, setInterviewPrep] = useState(null);
   const [skillsGap, setSkillsGap] = useState(null);
+  const [quality, setQuality] = useState(null);
+  const [pipelineSteps, setPipelineSteps] = useState([]);
   const [loading, setLoading] = useState({});
   const [error, setError] = useState(null);
 
@@ -26,6 +29,58 @@ export function useAnalysis(sessionId) {
       return null;
     } finally {
       setLoad("analyze", false);
+    }
+  }, [sessionId]);
+
+  // Full multi-agent pipeline — streams progress, then sets all results at once
+  const runFullPipeline = useCallback(async (jobDescription, candidateName) => {
+    setLoad("pipeline", true);
+    setError(null);
+    setPipelineSteps([]);
+    try {
+      const res = await api.runFullPipeline(sessionId, jobDescription, candidateName);
+      if (!res.ok) throw new Error("Pipeline failed to start");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); // keep incomplete line
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === "progress") {
+              setPipelineSteps((prev) => [...prev, event]);
+            } else if (event.type === "result") {
+              const d = event.data;
+              setAnalysis(d.analysis);
+              setStrategy(d.strategy);
+              setRewrittenResume(d.rewrittenResume || "");
+              setCoverLetter(d.coverLetter || "");
+              setInterviewPrep(d.interviewPrep || null);
+              setSkillsGap(d.skillsGap || null);
+              setQuality(d.quality || null);
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          } catch (parseErr) {
+            // skip malformed lines
+          }
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoad("pipeline", false);
     }
   }, [sessionId]);
 
@@ -86,17 +141,21 @@ export function useAnalysis(sessionId) {
 
   const reset = () => {
     setAnalysis(null);
+    setStrategy(null);
     setRewrittenResume("");
     setCoverLetter("");
     setInterviewPrep(null);
     setSkillsGap(null);
+    setQuality(null);
+    setPipelineSteps([]);
     setError(null);
   };
 
   return {
-    analysis, rewrittenResume, coverLetter, interviewPrep, skillsGap,
+    analysis, strategy, rewrittenResume, coverLetter, interviewPrep, skillsGap,
+    quality, pipelineSteps,
     loading, error,
-    analyzeMatch, rewriteResume, generateCoverLetter,
+    analyzeMatch, runFullPipeline, rewriteResume, generateCoverLetter,
     generateInterviewPrep, analyzeSkillsGap, reset,
   };
 }

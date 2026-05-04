@@ -6,7 +6,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { config } from "../config/index.js";
 
 const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.0-flash",
+  model: "gemini-2.5-flash",
   apiKey: config.geminiApiKey,
   temperature: 0.1,
 });

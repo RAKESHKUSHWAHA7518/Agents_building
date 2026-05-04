@@ -8,7 +8,7 @@ import { webSearchTool, readArticleTool } from "../tools/webTools.js";
 import { runAgentLoop } from "../utils/agentRunner.js";
 
 const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.0-flash",
+  model: "gemini-2.5-flash",
   apiKey: config.geminiApiKey,
   temperature: 0,
 }).bindTools([webSearchTool, readArticleTool]);

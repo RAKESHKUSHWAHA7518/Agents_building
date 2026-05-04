@@ -66,6 +66,15 @@ export const api = {
     return handleResponse(res);
   },
 
+  // Full multi-agent pipeline — returns SSE stream with progress + final result
+  async runFullPipeline(sessionId, jobDescription, candidateName) {
+    return fetch(`${BASE}/analysis/full-pipeline`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, jobDescription, candidateName }),
+    });
+  },
+
   // Delete session
   async deleteSession(sessionId) {
     await fetch(`${BASE}/session/${sessionId}`, { method: "DELETE" });

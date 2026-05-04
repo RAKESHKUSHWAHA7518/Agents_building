@@ -36,9 +36,10 @@ export default function App() {
   } = useSession();
 
   const {
-    analysis, rewrittenResume, coverLetter, interviewPrep, skillsGap,
+    analysis, strategy, rewrittenResume, coverLetter, interviewPrep, skillsGap,
+    quality, pipelineSteps,
     loading, error: analysisError,
-    analyzeMatch, rewriteResume, generateCoverLetter,
+    analyzeMatch, runFullPipeline, rewriteResume, generateCoverLetter,
     generateInterviewPrep, analyzeSkillsGap, reset: resetAnalysis,
   } = useAnalysis(session?.sessionId);
 
@@ -53,31 +54,35 @@ export default function App() {
     setActiveTab("analysis");
   };
 
-  // Analyze and switch to analysis tab
+  // Single analysis only
   const handleAnalyze = async () => {
     const result = await analyzeMatch(jobDescription);
     if (result) setActiveTab("analysis");
   };
 
-  // Rewrite and switch to resume tab
+  // ── Multi-agent: run all 4 agents at once ──
+  const handleRunPipeline = async () => {
+    if (!jobDescription.trim()) return;
+    setActiveTab("analysis");
+    await runFullPipeline(jobDescription, candidateName);
+  };
+
+  // Individual handlers
   const handleRewrite = async () => {
     setActiveTab("resume");
     await rewriteResume();
   };
 
-  // Cover letter and switch tab
   const handleCoverLetter = async () => {
     setActiveTab("cover");
     await generateCoverLetter(candidateName);
   };
 
-  // Interview prep and switch tab
   const handleInterviewPrep = async () => {
     setActiveTab("interview");
     await generateInterviewPrep();
   };
 
-  // Skills gap and switch tab
   const handleSkillsGap = async () => {
     setActiveTab("skills");
     await analyzeSkillsGap();
@@ -86,10 +91,10 @@ export default function App() {
   // Only show tabs that have content or are loading
   const visibleTabs = TABS.filter(t => {
     if (t.id === "analysis") return true;
-    if (t.id === "resume") return rewrittenResume || loading.rewrite;
-    if (t.id === "cover") return coverLetter || loading.cover;
-    if (t.id === "interview") return interviewPrep || loading.interview;
-    if (t.id === "skills") return skillsGap || loading.skills;
+    if (t.id === "resume") return rewrittenResume || loading.rewrite || loading.pipeline;
+    if (t.id === "cover") return coverLetter || loading.cover || loading.pipeline;
+    if (t.id === "interview") return interviewPrep || loading.interview || loading.pipeline;
+    if (t.id === "skills") return skillsGap || loading.skills || loading.pipeline;
     return false;
   });
 
@@ -121,10 +126,11 @@ export default function App() {
           />
         </div>
 
-        {/* Results */}
-        {analysis && (
+        {/* Results — show ActionBar as soon as we have a session + JD, or after analysis */}
+        {(analysis || loading.pipeline) && (
           <>
             <ActionBar
+              onRunPipeline={handleRunPipeline}
               onRewrite={handleRewrite}
               onCoverLetter={handleCoverLetter}
               onInterviewPrep={handleInterviewPrep}
@@ -147,20 +153,50 @@ export default function App() {
             </div>
 
             {/* Tab content */}
-            {activeTab === "analysis" && <AnalysisTab analysis={analysis} />}
-            {activeTab === "resume" && <ResumeTab rewrittenResume={rewrittenResume} loading={loading.rewrite} candidateName={candidateName} />}
-            {activeTab === "cover" && <CoverLetterTab coverLetter={coverLetter} loading={loading.cover} candidateName={candidateName} />}
-            {activeTab === "interview" && <InterviewTab interviewPrep={interviewPrep} loading={loading.interview} candidateName={candidateName} />}
-            {activeTab === "skills" && <SkillsGapTab skillsGap={skillsGap} loading={loading.skills} />}
+            {activeTab === "analysis" && (
+              <AnalysisTab
+                analysis={analysis}
+                strategy={strategy}
+                quality={quality}
+                pipelineSteps={pipelineSteps}
+              />
+            )}
+            {activeTab === "resume" && (
+              <ResumeTab
+                rewrittenResume={rewrittenResume}
+                loading={loading.rewrite || loading.pipeline}
+                candidateName={candidateName}
+              />
+            )}
+            {activeTab === "cover" && (
+              <CoverLetterTab
+                coverLetter={coverLetter}
+                loading={loading.cover || loading.pipeline}
+                candidateName={candidateName}
+              />
+            )}
+            {activeTab === "interview" && (
+              <InterviewTab
+                interviewPrep={interviewPrep}
+                loading={loading.interview || loading.pipeline}
+                candidateName={candidateName}
+              />
+            )}
+            {activeTab === "skills" && (
+              <SkillsGapTab
+                skillsGap={skillsGap}
+                loading={loading.skills || loading.pipeline}
+              />
+            )}
           </>
         )}
 
         {/* Empty states */}
-        {!analysis && session && (
+        {!analysis && !loading.pipeline && session && (
           <div className="empty-state">
             <div className="empty-icon">🎯</div>
             <h3>Ready to analyze</h3>
-            <p>Paste a job description and click "Analyze Match"</p>
+            <p>Paste a job description, then click <strong>Analyze Match</strong> for a quick analysis or <strong>🤖 Run All Agents</strong> to generate everything at once.</p>
           </div>
         )}
 
