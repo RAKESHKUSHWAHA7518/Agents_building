@@ -31,6 +31,7 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 2. THE AI_Service SHALL return the search query as a JSON object with fields: `jobTitle` (string), `skills` (array of strings, max 5), and `location` (string, optional).
 3. IF the resume text is fewer than 50 characters, THEN THE AI_Service SHALL return an error indicating the resume content is insufficient to generate a search query.
 4. THE AI_Service SHALL generate the search query within 10 seconds of being invoked.
+5. IF the AI_Service cannot extract any relevant skills from the resume, THEN THE AI_Service SHALL return an error indicating the resume does not contain sufficient skill information, and SHALL NOT generate a search query with an empty skills array.
 
 ---
 
@@ -71,9 +72,10 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 
 1. THE Job_Finder SHALL expose a `POST /api/jobs/search` endpoint that accepts a JSON body with `sessionId` (string, required) and `timeFilter` (string, one of `"24h"`, `"2d"`, `"7d"`, required).
 2. WHEN a valid request is received, THE Job_Finder SHALL return a JSON response with: `jobs` (array of scored Job_Listing objects), `query` (the generated search query object), and `totalCount` (integer).
-3. IF the `sessionId` does not correspond to an active Session with a parsed resume, THEN THE Job_Finder SHALL return HTTP 404 with a descriptive error message.
+3. IF the `sessionId` does not correspond to an active Session with a parsed resume, THEN THE Job_Finder SHALL return HTTP 404 with a descriptive error message. IF a request contains both an invalid `sessionId` and a malformed or missing `timeFilter`, THEN THE Job_Finder SHALL still return HTTP 404.
 4. IF the `timeFilter` value is not one of the accepted values, THEN THE Job_Finder SHALL return HTTP 400 with a descriptive error message.
 5. THE Job_Finder SHALL respond to valid requests within 30 seconds.
+6. WHERE a session has expired but resume data is still available in the session store, THE Job_Finder SHALL allow the search to proceed using the available resume data rather than returning HTTP 404.
 
 ---
 
@@ -87,7 +89,7 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 2. THE Job_Results_Panel SHALL display a loading indicator while the job search request is in progress.
 3. WHEN a Job_Listing has `isHighMatch` set to `true`, THE Job_Results_Panel SHALL visually distinguish that card (e.g., a highlighted border or "Top Match" badge).
 4. IF the job search returns zero results, THEN THE Job_Results_Panel SHALL display a message stating no jobs were found and suggest broadening the search.
-5. IF the job search request fails, THEN THE Job_Results_Panel SHALL display an error message and a retry button.
+5. IF the job search request fails, THEN THE Job_Results_Panel SHALL display both an error message and a retry button together. The error message and retry button SHALL always appear as a pair and SHALL NOT be displayed independently of each other.
 6. THE Job_Results_Panel SHALL display results sorted by Relevance_Score in descending order, matching the order returned by the backend.
 
 ---
@@ -101,8 +103,9 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 1. THE Job_Results_Panel SHALL display a time filter control with three options: "Last 24 Hours", "Last 2 Days", and "Last 7 Days".
 2. WHEN a user selects a different Time_Filter option, THE Job_Results_Panel SHALL trigger a new job search request to the backend with the updated `timeFilter` value.
 3. THE Job_Results_Panel SHALL display the currently active Time_Filter option as visually selected.
-4. WHILE a new job search request is in progress after a filter change, THE Job_Results_Panel SHALL display a loading indicator and disable the filter controls to prevent duplicate requests.
+4. WHILE a new job search request is in progress after a filter change, THE Job_Results_Panel SHALL display a loading indicator and disable the filter controls to prevent duplicate requests. Users SHALL NOT be able to queue a new filter selection while a search is running and SHALL wait for the current search to complete before selecting a new filter.
 5. THE Job_Results_Panel SHALL default to the "Last 7 Days" filter on initial load.
+6. WHILE the initial page load search is in progress, THE Job_Results_Panel SHALL NOT disable the filter controls.
 
 ---
 
@@ -115,7 +118,7 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 1. THE Job_Results_Panel SHALL render an "Apply" button on each Job_Listing card.
 2. WHEN a user clicks the "Apply" button, THE Job_Results_Panel SHALL open the Job_Listing's `applyUrl` in a new browser tab.
 3. THE Job_Results_Panel SHALL set the `rel="noopener noreferrer"` attribute on all external apply links for security.
-4. WHILE a job search is loading, THE Job_Results_Panel SHALL disable all "Apply" buttons until results are fully rendered.
+4. WHILE a job search is loading, THE Job_Results_Panel SHALL disable all "Apply" buttons until results are fully rendered. Disabled "Apply" buttons SHALL NOT respond to click events or keyboard activation and SHALL NOT open the apply URL under any circumstances.
 
 ---
 
@@ -127,7 +130,7 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 
 1. WHEN a resume has been successfully uploaded and parsed, THE Job_Results_Panel SHALL become visible in the UI as a new tab or section alongside the existing Analysis, Resume, Cover Letter, Interview, and Skills Gap tabs.
 2. THE Job_Results_Panel SHALL use the existing `sessionId` from the current Session to fetch job results, without requiring the user to re-upload their resume.
-3. WHEN the user resets the session (clears the resume), THE Job_Results_Panel SHALL clear all displayed job results and return to its initial empty state.
+3. WHEN the user resets the session (clears the resume), THE Job_Results_Panel SHALL immediately clear all displayed job results and return to its initial empty state. Job results MAY also be cleared through other mechanisms such as page navigation or refresh.
 4. THE Job_Finder SHALL read the resume text from the existing Session store using the provided `sessionId`, without requiring the resume to be re-parsed.
 
 ---
@@ -140,5 +143,5 @@ This feature extends the existing Job Assistant application (Node.js/Express + R
 
 1. IF the Job_Board_API is unavailable, THEN THE Job_Finder SHALL return a structured error response without affecting the existing resume analysis features.
 2. IF the AI_Service fails to generate a search query, THEN THE Job_Finder SHALL fall back to using the most recent job title extracted from the resume text as the search query.
-3. WHEN an error occurs during job search, THE Job_Results_Panel SHALL display a user-friendly error message that does not expose internal API error details.
+3. WHEN an error occurs during job search, THE Job_Results_Panel SHALL display a user-friendly error message that does not expose internal API error details in the main error message. Internal details MAY appear in other parts of the UI outside the primary error message display.
 4. THE Job_Finder SHALL log all Job_Board_API errors with the request parameters and response status for debugging purposes.
