@@ -2,15 +2,20 @@
 // ROLE: Searches the web for a specific subtopic
 // OUTPUT: Raw search results + article content
 
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatOpenAI } from "@langchain/openai";
 import { config } from "../config/index.js";
 import { webSearchTool, readArticleTool } from "../tools/webTools.js";
 import { runAgentLoop } from "../utils/agentRunner.js";
 
-const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
-  apiKey: config.geminiApiKey,
+// MiniMax M3 does not support tool calling — use Llama 3.1 70B which does
+const model = new ChatOpenAI({
+  model: "meta/llama-3.1-70b-instruct",
+  apiKey: config.nvidiaApiKey,
+  configuration: {
+    baseURL: "https://integrate.api.nvidia.com/v1",
+  },
   temperature: 0,
+  maxTokens: 4096,
 }).bindTools([webSearchTool, readArticleTool]);
 
 const SYSTEM_PROMPT = `Search Agent — you find information on the web.

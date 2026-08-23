@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+
+# Secrets — never commit
+.env
+.env.local
+
+# Runtime data
+backend/data/
+backend/uploads/
+
+# Logs
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

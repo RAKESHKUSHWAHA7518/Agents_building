@@ -1,4 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import AuthModal from "./components/AuthModal.jsx";
+import {
+  authHeaders,
+  clearAuth,
+  deleteDocument,
+  errorCode,
+  errorMessage,
+  getStoredAuth,
+  listDocuments,
+  openDocument,
+  storeAuth,
+} from "./api.js";
 import "./App.css";
 
 // Use relative URL so Vite proxy handles it (avoids CORS issues)
@@ -25,10 +38,26 @@ export default function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState(null);
+  const [auth, setAuth] = useState(getStoredAuth);     // { token, email } | null
+  const [guestQuota, setGuestQuota] = useState(null);  // { used, limit, remaining } for guests
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [documents, setDocuments] = useState([]);      // saved PDFs (signed-in users)
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const pendingFileRef = useRef(null);                 // file that hit the signup wall
+  const sessionRef = useRef(null);                     // tracks session for async callbacks
+  const docsLoadedRef = useRef(null);                  // prevents double-loading in StrictMode
+
+  // Mirror session into a ref (env var so async callbacks always see the latest)
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // Cancel any in-flight stream when the component unmounts
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -42,6 +71,85 @@ export default function App() {
       return () => clearTimeout(t);
     }
   }, [error]);
+
+  // ── Auth logout (defined early — library helpers reference it) ──
+  const handleLogout = useCallback(() => {
+    clearAuth();
+    setAuth(null);
+    setGuestQuota(null);
+    setDocuments([]);
+    docsLoadedRef.current = null;
+  }, []);
+
+  // ── Document library (signed-in users): restore after close / refresh ──
+  const openDocumentById = useCallback(async (sessionId) => {
+    if (!auth || sessionRef.current?.sessionId === sessionId) return;
+    try {
+      const data = await openDocument(auth, sessionId);
+      setSession(data);
+      setMessages([
+        {
+          id: Date.now(),
+          role: "assistant",
+          content: `Welcome back! I still have **${data.fileName}** (${data.pageCount} pages) ready. Ask me anything about it!`,
+          time: new Date(),
+        },
+      ]);
+      setInput("");
+    } catch (err) {
+      if (err.status === 401) { handleLogout(); return; }
+      setError(err.message);
+      // Drop broken docs from the list (e.g. expired)
+      if (err.status === 404 || err.status === 410) {
+        setDocuments((prev) => prev.filter((d) => d.sessionId !== sessionId));
+      }
+    }
+  }, [auth, handleLogout]);
+
+  const openDocumentByIdRef = useRef(openDocumentById);
+  useEffect(() => {
+    openDocumentByIdRef.current = openDocumentById;
+  }, [openDocumentById]);
+
+  const loadDocuments = useCallback(async (currentAuth, { autoOpen } = { autoOpen: true }) => {
+    try {
+      const docs = await listDocuments(currentAuth);
+      setDocuments(docs);
+      // Auto-restore the most recent PDF if nothing is active (accidental close)
+      if (
+        autoOpen &&
+        !sessionRef.current &&
+        !pendingFileRef.current &&
+        docs.length > 0
+      ) {
+        openDocumentByIdRef.current(docs[0].sessionId);
+      }
+    } catch (err) {
+      if (err.status === 401) handleLogout();
+      else setError(err.message);
+    }
+  }, [handleLogout]);
+
+  // Load the document library on login / page reload
+  useEffect(() => {
+    if (!auth) return; // logout cleanup happens inside handleLogout
+    if (docsLoadedRef.current === auth.token) return;
+    docsLoadedRef.current = auth.token;
+    loadDocuments(auth);
+  }, [auth, loadDocuments]);
+
+  const handleDeleteDocument = async (sessionId) => {
+    try {
+      await deleteDocument(auth, sessionId);
+      setDocuments((prev) => prev.filter((d) => d.sessionId !== sessionId));
+      if (sessionRef.current?.sessionId === sessionId) {
+        setSession(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   // ── Handle PDF upload ──
   const handleUpload = useCallback(async (file) => {
@@ -59,14 +167,25 @@ export default function App() {
     try {
       const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
+        headers: authHeaders(auth),
         body: formData,
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Upload failed");
+      if (!res.ok) {
+        // Free trial exhausted → show the signup wall, then auto-retry after auth
+        if (errorCode(data) === "AUTH_REQUIRED") {
+          pendingFileRef.current = file;
+          setShowAuthModal(true);
+        }
+        throw new Error(errorMessage(data, "Upload failed"));
+      }
 
+      if (data.guestQuota) setGuestQuota(data.guestQuota);
       setSession(data);
+      // Signed-in: the new PDF joins the persistent library
+      if (auth) loadDocuments(auth, { autoOpen: false });
       setMessages([
         {
           id: Date.now(),
@@ -80,7 +199,7 @@ export default function App() {
     } finally {
       setIsUploading(false);
     }
-  }, []);
+  }, [auth, loadDocuments]);
 
   // ── File input change ──
   const onFileChange = (e) => {
@@ -115,11 +234,15 @@ export default function App() {
     setInput("");
     setIsStreaming(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders(auth) },
         body: JSON.stringify({ sessionId: session.sessionId, question }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -130,7 +253,7 @@ export default function App() {
           setMessages([]);
           throw new Error("Session expired. Please upload your PDF again.");
         }
-        throw new Error(errData.error || "Chat request failed");
+        throw new Error(errorMessage(errData, "Chat request failed"));
       }
 
       // Read SSE stream
@@ -167,6 +290,7 @@ export default function App() {
         }
       }
     } catch (err) {
+      if (err.name === "AbortError") return; // user cancelled — leave messages as-is
       setError(err.message);
       setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
     } finally {
@@ -178,7 +302,7 @@ export default function App() {
       );
       setIsStreaming(false);
     }
-  }, [session, isStreaming]);
+  }, [session, isStreaming, auth]);
 
   // ── Handle Enter key ──
   const onKeyDown = (e) => {
@@ -200,17 +324,30 @@ export default function App() {
 
   // ── Reset session ──
   const resetSession = async () => {
+    abortControllerRef.current?.abort();
     if (session) {
-      await fetch(`${API_URL}/session/${session.sessionId}`, { method: "DELETE" }).catch(() => {});
+      await fetch(`${API_URL}/session/${session.sessionId}`, {
+        method: "DELETE",
+        headers: authHeaders(auth),
+      }).catch(() => {});
     }
     setSession(null);
     setMessages([]);
     setInput("");
   };
 
-  // ── Render message content (basic markdown bold) ──
-  const renderContent = (text) => {
-    return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  // ── Auth handlers ──
+  const handleAuthSuccess = (data) => {
+    storeAuth(data);
+    setAuth({ token: data.token, email: data.user.email });
+    setShowAuthModal(false);
+    setGuestQuota(null);
+    // Retry the upload that triggered the signup wall
+    if (pendingFileRef.current) {
+      const file = pendingFileRef.current;
+      pendingFileRef.current = null;
+      handleUpload(file);
+    }
   };
 
   return (
@@ -223,6 +360,34 @@ export default function App() {
             <h1>PDF Chat</h1>
             <span>Powered by Gemini AI</span>
           </div>
+        </div>
+
+        {/* Account / free-trial status */}
+        <div className="auth-section">
+          {auth ? (
+            <div className="auth-user">
+              <div className="auth-user-info">
+                <div className="auth-avatar">{auth.email[0].toUpperCase()}</div>
+                <div>
+                  <p className="auth-email">{auth.email}</p>
+                  <span className="auth-plan">✨ Unlimited uploads</span>
+                </div>
+              </div>
+              <button className="auth-logout-btn" onClick={handleLogout}>
+                Log out
+              </button>
+            </div>
+          ) : (
+            <div className="auth-guest">
+              <div className="auth-trial-badge">
+                🎁 Free trial
+                {guestQuota && ` · ${guestQuota.remaining}/${guestQuota.limit} upload${guestQuota.limit > 1 ? "s" : ""} left`}
+              </div>
+              <button className="auth-signup-btn" onClick={() => setShowAuthModal(true)}>
+                Sign up for unlimited
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Upload section */}
@@ -283,6 +448,42 @@ export default function App() {
           )}
         </div>
 
+        {/* Saved documents (signed-in users) — survive browser close */}
+        {auth && documents.length > 0 && (
+          <div className="documents-section">
+            <h2>My Documents</h2>
+            <div className="documents-list">
+              {documents.map((doc) => (
+                <div
+                  key={doc.sessionId}
+                  className={`document-item ${session?.sessionId === doc.sessionId ? "active" : ""}`}
+                >
+                  <button
+                    className="document-open"
+                    onClick={() => openDocumentById(doc.sessionId)}
+                    title={doc.fileName}
+                  >
+                    <span className="document-icon">📕</span>
+                    <span className="document-info">
+                      <span className="document-name">{doc.fileName}</span>
+                      <span className="document-meta">
+                        {doc.pageCount} pages · {doc.chunkCount} chunks
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    className="document-delete"
+                    onClick={() => handleDeleteDocument(doc.sessionId)}
+                    title="Delete document"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="sidebar-footer">
           <p>
             Built with <span>LangChain.js</span> + <span>Gemini</span><br />
@@ -342,10 +543,9 @@ export default function App() {
                         <div className="typing-dot" />
                       </div>
                     ) : (
-                      <div
-                        className="message-bubble"
-                        dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
-                      />
+                      <div className="message-bubble">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
                     )}
                     <div className="message-time">{formatTime(msg.time)}</div>
                   </div>
@@ -397,6 +597,11 @@ export default function App() {
 
       {/* Error toast */}
       {error && <div className="error-toast">⚠️ {error}</div>}
+
+      {/* Signup wall */}
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={handleAuthSuccess} />
+      )}
     </div>
   );
 }

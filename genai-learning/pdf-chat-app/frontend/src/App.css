@@ -615,3 +615,351 @@
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+/* ── Auth: Sidebar Section ── */
+.auth-section {
+  background: #1a1a24;
+  border: 1px solid #2d2d3a;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.auth-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.auth-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.auth-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-email {
+  font-size: 12px;
+  color: #e2e8f0;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.auth-plan {
+  font-size: 10px;
+  color: #a78bfa;
+}
+
+.auth-logout-btn {
+  background: none;
+  border: 1px solid #2d2d3a;
+  color: #64748b;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-logout-btn:hover {
+  color: #fca5a5;
+  border-color: #7f1d1d;
+}
+
+.auth-guest {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-trial-badge {
+  font-size: 12px;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.auth-signup-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-signup-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+/* ── Auth: Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.auth-modal {
+  position: relative;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #16161d;
+  border: 1px solid #2d2d3a;
+  border-radius: 16px;
+  padding: 28px 24px 20px;
+  animation: modalIn 0.25s ease;
+}
+
+@keyframes modalIn {
+  from { transform: translateY(12px) scale(0.97); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.modal-close:hover {
+  color: #e2e8f0;
+  background: #1e1e2e;
+}
+
+.auth-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 6px;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 6px;
+  background: #1a1a24;
+  border: 1px solid #2d2d3a;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.auth-tab.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-form input {
+  background: #1a1a24;
+  border: 1px solid #2d2d3a;
+  border-radius: 9px;
+  padding: 11px 12px;
+  font-size: 13px;
+  color: #e2e8f0;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.auth-form input:focus {
+  border-color: #6366f1;
+}
+
+.auth-form input::placeholder {
+  color: #475569;
+}
+
+.auth-error {
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid #991b1b;
+  color: #fca5a5;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.auth-submit-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-note {
+  font-size: 11px;
+  color: #475569;
+  text-align: center;
+  margin-top: 14px;
+}
+
+/* ── My Documents (persistent library) ── */
+.documents-section h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.documents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  background: #1a1a24;
+  border: 1px solid #2d2d3a;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.document-item:hover {
+  border-color: #3d3d4d;
+}
+
+.document-item.active {
+  border-color: #6366f1;
+  background: #1e1e2e;
+}
+
+.document-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 10px 8px 10px 10px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.document-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.document-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.document-name {
+  font-size: 12px;
+  color: #e2e8f0;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.document-item.active .document-name {
+  color: #a5b4fc;
+}
+
+.document-meta {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.document-delete {
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 11px;
+  padding: 8px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.document-delete:hover {
+  color: #fca5a5;
+}

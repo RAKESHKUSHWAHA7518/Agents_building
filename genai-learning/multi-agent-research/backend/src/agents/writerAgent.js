@@ -2,13 +2,17 @@
 // ROLE: Writes the final comprehensive research report
 // OUTPUT: Well-structured markdown report
 
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatOpenAI } from "@langchain/openai";
 import { config } from "../config/index.js";
 
-const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
-  apiKey: config.geminiApiKey,
+const model = new ChatOpenAI({
+  model: "meta/llama-3.1-70b-instruct",
+  apiKey: config.nvidiaApiKey,
+  configuration: {
+    baseURL: "https://integrate.api.nvidia.com/v1",
+  },
   temperature: 0.4,
+  maxTokens: 8192,
 });
 
 const SYSTEM_PROMPT = `You are a Research Writer Agent.

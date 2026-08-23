@@ -1,0 +1,39 @@
+# Run the whole stack with: docker compose up --build
+# Includes a local MongoDB Atlas deployment (supports Vector Search).
+services:
+  mongodb:
+    image: mongodb/mongodb-atlas-local:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:8080
+      MONGODB_URI: mongodb://mongodb:27017/?directConnection=true
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
